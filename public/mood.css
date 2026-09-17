@@ -1,0 +1,25 @@
+/* Esboço do Mood do Dia */
+.mood-card {
+    --mood-color: #9d7cff;
+    position: fixed;
+    right: 18px;
+    bottom: 18px;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(300px, calc(100vw - 36px));
+    padding: 11px 14px;
+    border: 1px solid color-mix(in srgb, var(--mood-color), transparent 65%);
+    border-radius: 14px;
+    background: rgba(16, 16, 20, .92);
+    box-shadow: 0 8px 30px rgba(0,0,0,.3), 0 0 22px color-mix(in srgb, var(--mood-color), transparent 82%);
+    backdrop-filter: blur(14px);
+    color: #f4f4f5;
+    font-size: 12px;
+}
+.mood-card > span { font-size: 22px; }
+.mood-card strong, .mood-card small { display: block; }
+.mood-card small { margin-top: 3px; color: #a6a6af; line-height: 1.35; }
+.mood-loading { opacity: .7; }
+@media (max-width: 600px) { .mood-card { right: 12px; bottom: 12px; } }

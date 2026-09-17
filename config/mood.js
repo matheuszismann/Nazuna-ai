@@ -1,15 +1,40 @@
 const MOODS = [
-  { id: 'lazy', title: 'Com preguiça', description: 'Acordou tarde e não quer papo longo.', react: 'thinking' },
-  { id: 'tsundere', title: 'Irritadiça', description: 'Reclamando de tudo, mas respondendo assim mesmo.', react: 'tsundere' },
-  { id: 'happy', title: 'De bom humor', description: 'Curiosa e com vontade de conversar!', react: 'happy' },
-  { id: 'sleepy', title: 'Sonolenta', description: 'Respostas mais curtas e bocejando.', react: 'sleepy' }
+    {
+        id: "lazy",
+        title: "Com preguiça",
+        description: "Acordei tarde e hoje prefiro papos mais curtos.",
+        react: "😴",
+        color: "#9d7cff"
+    },
+    {
+        id: "tsundere",
+        title: "Irritadiça",
+        description: "Estou meio implicante hoje... mas ainda vou te responder.",
+        react: "🙄",
+        color: "#ff8fa3"
+    },
+    {
+        id: "happy",
+        title: "De bom humor",
+        description: "Estou curiosa e com vontade de conversar!",
+        react: "✨",
+        color: "#ffd166"
+    },
+    {
+        id: "sleepy",
+        title: "Sonolenta",
+        description: "Respostas mais tranquilas, com alguns bocejos pelo caminho.",
+        react: "🌙",
+        color: "#78a9ff"
+    }
 ];
 
-export function getTodayMood() {
-  const today = new Date();
-  // Cria um índice único para o dia (ex: 20261015)
-  const dayHash = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-  const index = dayHash % MOODS.length;
-  
-  return MOODS[index];
+function getTodayMood(date = new Date()) {
+    const dayHash = date.getFullYear() * 10000
+        + (date.getMonth() + 1) * 100
+        + date.getDate();
+
+    return MOODS[dayHash % MOODS.length];
 }
+
+module.exports = { MOODS, getTodayMood };
