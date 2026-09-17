@@ -1,32 +1,9 @@
-// =========================
-// DEPENDÊNCIAS
-// =========================
-
 const express = require("express");
+const { chatController, clearChatContextController } = require("../controllers/chat.controller");
 
-const {
-    chatController
-} = require("../controllers/chat.controller");
+const router = express.Router();
 
-// =========================
-// ROUTER
-// =========================
-
-const router =
-    express.Router();
-
-// =========================
-// CHAT
-// =========================
-
-router.post(
-    "/",
-    chatController
-);
-
-// =========================
-// EXPORT
-// =========================
+router.post("/", chatController);
+router.post("/context", clearChatContextController);
 
 module.exports = router;
-

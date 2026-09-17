@@ -25,10 +25,8 @@ app.use("/api", healthRoutes);
 app.get("/", (req, res) => {
     const indexPath = path.join(__dirname, "public", "index.html");
     let html = fs.readFileSync(indexPath, "utf8");
-
-    // Injeta o esboço sem exigir alteração manual no HTML existente.
     html = html.replace("</head>", '<link rel="stylesheet" href="/mood.css"></head>');
-    html = html.replace("</body>", '<script src="/mood.js"></script></body>');
+    html = html.replace("</body>", '<script src="/mood.js"></script><script src="/context.js"></script></body>');
     res.type("html").send(html);
 });
 
