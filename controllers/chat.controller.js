@@ -1,197 +1,92 @@
-// =========================
-// DEPENDÊNCIAS
-// =========================
-
+const { getTodayMood } = require("../config/mood");
+const { generateResponse } = require("../ai/gemini");
+const { parseNazunaResponse } = require("../parsers/nazuna.parser");
 const {
-    generateGeminiResponse
-} = require("../ai/gemini");
+    applyLearning,
+    buildMemoryContext,
+    saveContextMessages,
+    clearContext
+} = require("../memory/memory.store");
+const { nazunaInstructions } = require("../prompts/nazuna.instructions");
 
-const nazunaInstructions =
-    require("../prompts/nazuna.instructions");
-
-const {
-    parseNazunaResponse
-} = require("../parsers/nazuna.parser");
-
-// =========================
-// CHAT CONTROLLER
-// =========================
-
-async function chatController(req, res) {
-
-    console.log(
-        "📩 /api/chat recebeu uma mensagem."
-    );
-
-    try {
-
-        // =========================
-        // MENSAGEM
-        // =========================
-
-        const {
-            message
-        } = req.body;
-
-        // =========================
-        // VALIDAÇÃO
-        // =========================
-
-        if (
-            typeof message !== "string" ||
-            !message.trim()
-        ) {
-
-            console.log(
-                "⚠️ Mensagem inválida."
-            );
-
-            return res.status(400).json({
-
-                error:
-                    "Mensagem inválida."
-
-            });
-
-        }
-
-        if (
-            message.length > 10000
-        ) {
-
-            return res.status(400).json({
-
-                error:
-                    "Mensagem muito grande."
-
-            });
-
-        }
-
-        const cleanMessage =
-            message.trim();
-
-        console.log(
-            "💬 Mensagem recebida."
-        );
-
-        // =========================
-        // GEMINI
-        // =========================
-
-        console.log(
-            "🤖 Enviando mensagem para Gemini..."
-        );
-
-        const rawReply =
-            await generateGeminiResponse({
-
-                systemInstruction:
-                    nazunaInstructions,
-
-                message:
-                    cleanMessage
-
-            });
-
-        // =========================
-        // PROCESSAR RESPOSTA
-        // =========================
-
-        const nazuna =
-            parseNazunaResponse(
-                rawReply
-            );
-
-        if (
-            !nazuna.response ||
-            nazuna.response.length === 0
-        ) {
-
-            console.error(
-                "❌ Não foi possível extrair a resposta da Nazuna."
-            );
-
-            return res.status(502).json({
-
-                error:
-                    "Não foi possível interpretar a resposta da IA."
-
-            });
-
-        }
-
-        console.log(
-            "🧠 Resposta interpretada:",
-            nazuna.json
-                ? "JSON"
-                : "TEXTO"
-        );
-
-        // =========================
-        // MEMÓRIA
-        // =========================
-
-        if (nazuna.aprender) {
-
-            console.log(
-                "📝 Nazuna identificou informação para memória:"
-            );
-
-            console.log(
-                JSON.stringify(
-                    nazuna.aprender,
-                    null,
-                    2
-                )
-            );
-
-        }
-
-        // =========================
-        // RESPOSTA
-        // =========================
-
-        console.log(
-            "✅ Nazuna respondeu com sucesso!"
-        );
-
-        return res.json({
-
-            response:
-                nazuna.response,
-
-            aprender:
-                nazuna.aprender
-
-        });
-
-    } catch (error) {
-
-        console.error(
-            "💥 Erro no chatController:"
-        );
-
-        console.error(
-            error
-        );
-
-        return res.status(500).json({
-
-            error:
-                "Erro interno do servidor."
-
-        });
-
-    }
-
+function validUserId(userId) {
+    return typeof userId === "string" && /^[a-f0-9-]{36}$/i.test(userId.trim());
 }
 
-// =========================
-// EXPORT
-// =========================
+async function chatController(req, res) {
+    try {
+        const { message, userId } = req.body;
 
-module.exports = {
-    chatController
-};
+        if (typeof message !== "string" || !message.trim()) {
+            return res.status(400).json({ error: "Mensagem inválida." });
+        }
+        if (!validUserId(userId)) {
+            return res.status(400).json({ error: "User ID inválido." });
+        }
 
+        const cleanMessage = message.trim();
+        const cleanUserId = userId.trim();
+        const mood = getTodayMood();
+        const memoryContext = await buildMemoryContext(cleanUserId);
+
+        await saveContextMessages(cleanUserId, [{ role: "user", content: cleanMessage }]);
+
+        const instructions = [
+            nazunaInstructions,
+            "",
+            "MOOD DO DIA — siga este estado de forma sutil, sem anunciar a regra:",
+            `Humor: ${mood.title}. ${mood.description}`,
+            "",
+            "MEMÓRIA E CONTEXTO PERSISTENTE DO USUÁRIO",
+            memoryContext,
+            "Use essas informações somente quando forem relevantes.",
+            "Não invente memórias que não estejam presentes."
+        ].join("\n");
+
+        const rawResponse = await generateResponse(cleanMessage, instructions);
+        const nazuna = parseNazunaResponse(rawResponse);
+
+        if (!nazuna) return res.status(500).json({ error: "Resposta da IA inválida." });
+
+        const assistantText = nazuna.response
+            .map(item => item.resp)
+            .filter(Boolean)
+            .join("\n");
+        await saveContextMessages(cleanUserId, [{ role: "assistant", content: assistantText }]);
+
+        let memoryResult = null;
+        if (nazuna.aprender) memoryResult = await applyLearning(cleanUserId, nazuna.aprender);
+
+        return res.json({
+            response: nazuna.response,
+            aprender: nazuna.aprender,
+            mood,
+            memory: memoryResult ? {
+                success: memoryResult.success,
+                action: memoryResult.action || null,
+                reason: memoryResult.reason || null
+            } : null
+        });
+    } catch (error) {
+        console.error("❌ [CHAT] Erro no processamento:", error);
+        return res.status(500).json({ error: "Erro interno do servidor." });
+    }
+}
+
+async function clearChatContextController(req, res) {
+    try {
+        const { userId, action } = req.body;
+        if (!validUserId(userId)) return res.status(400).json({ error: "User ID inválido." });
+        if (String(action).toLowerCase() !== "remover") {
+            return res.status(400).json({ error: "Ação inválida. Use remover." });
+        }
+
+        const result = await clearContext(userId.trim());
+        return res.json({ action: "remover", ...result });
+    } catch (error) {
+        console.error("❌ [CONTEXT] Erro ao remover contexto:", error);
+        return res.status(500).json({ error: "Não foi possível remover o contexto." });
+    }
+}
+
+module.exports = { chatController, clearChatContextController };

@@ -1,96 +1,43 @@
-// =========================
-// DEPENDÊNCIAS
-// =========================
+require("dotenv").config();
 
 const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
 
-const {
-    PORT
-} = require("./config/env");
+const chatRoutes = require("./routes/chat.routes");
+const healthRoutes = require("./routes/health.routes");
+const moodRoutes = require("./routes/mood.routes");
+const { testDatabaseConnection } = require("./config/database");
 
-const configureServer =
-    require("./config/server.config");
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-const chatRoutes =
-    require("./routes/chat.routes");
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
 
-const healthRoutes =
-    require("./routes/health.routes");
+app.use("/api/chat", chatRoutes);
+app.use("/api/mood", moodRoutes);
+app.use("/api", healthRoutes);
 
-const errorMiddleware =
-    require("./middleware/error.middleware");
+app.get("/", (req, res) => {
+    const indexPath = path.join(__dirname, "public", "index.html");
+    let html = fs.readFileSync(indexPath, "utf8");
+    html = html.replace("</head>", '<link rel="stylesheet" href="/mood.css"></head>');
+    html = html.replace("</body>", '<script src="/mood.js"></script><script src="/context.js"></script></body>');
+    res.type("html").send(html);
+});
 
-// =========================
-// APLICAÇÃO
-// =========================
-
-const app =
-    express();
-
-// =========================
-// CONFIGURAÇÃO DO SERVIDOR
-// =========================
-
-configureServer(app);
-
-// =========================
-// ROTAS
-// =========================
-
-app.use(
-    "/api",
-    chatRoutes
-);
-
-app.use(
-    "/api",
-    healthRoutes
-);
-
-// =========================
-// 404 DA API
-// =========================
-
-app.use(
-    "/api",
-    (req, res) => {
-
-        res.status(404).json({
-
-            error:
-                "Endpoint não encontrado."
-
-        });
-
+async function startServer() {
+    try {
+        await testDatabaseConnection();
+        app.listen(PORT, () => console.log(`🚀 Nazuna-ai rodando na porta ${PORT}`));
+    } catch (error) {
+        console.error("❌ [SERVER] Falha ao conectar ao PostgreSQL:", error);
+        process.exit(1);
     }
-);
+}
 
-// =========================
-// ERRO GLOBAL
-// =========================
-
-app.use(
-    errorMiddleware
-);
-
-// =========================
-// INICIAR SERVIDOR
-// =========================
-
-app.listen(
-    PORT,
-    () => {
-
-        console.log(`
-
-╭────────────────────────────────╮
-│          NAZUNA AI             │
-│                                │
-│  Server: http://localhost:${PORT}
-│  Status: ONLINE                │
-╰────────────────────────────────╯
-
-        `);
-
-    }
-);
+startServer();
